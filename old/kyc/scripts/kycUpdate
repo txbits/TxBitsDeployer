@@ -1,0 +1,15 @@
+#!/bin/bash
+
+file="$1"
+if [ "$file" == "" ]; then 
+   echo "you must specify the .zip file name"
+else
+  sudo /etc/init.d/kyc stop
+  mkdir -p ~/kyc
+  rm -rf ~/kyc/current
+  noExt=$(basename "${file%.zip}")
+  echo "$noExt"
+  rm -rf ~/kyc/"$noExt"
+  unzip $file -d ~/kyc/
+  mv ~/kyc/"$noExt" ~/kyc/current
+fi

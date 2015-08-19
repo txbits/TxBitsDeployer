@@ -1,0 +1,2 @@
+#!/bin/sh
+exec chpst -u litecoind:litecoind /opt/litecoin/litecoin/src/litecoind -datadir=/opt/litecoin/.litecoin -conf=/opt/litecoin/litecoin.conf -daemon=0 > /var/log/litecoind.log 2> /var/log/litecoind.err

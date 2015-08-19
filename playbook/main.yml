@@ -1,0 +1,113 @@
+- hosts: all
+  vars_files:
+    - secrets/{{txbits_env}}/vars.yml
+  roles:
+    - os
+    - pretty
+
+- hosts: dbmem
+  vars:
+    txbits_config: txbits_database.conf
+    lumberjack_config: lumberjack_dbmem.conf
+    spipes:
+      - type: d
+        source: "0.0.0.0:{{port.memcached_pipe}}"
+        target: "127.0.0.1:{{port.memcached}}"
+        name: memcached
+  vars_files:
+    - secrets/{{txbits_env}}/vars.yml
+  roles:
+    - lumberjack
+    - memcached
+    - spiped
+    - exchange_frontend
+    - database
+
+- hosts: frontend
+  vars:
+    txbits_config: txbits_frontend.conf
+    lumberjack_config: lumberjack_frontend.conf
+    txbits_service: yes
+    spipes:
+      - type: e
+        source: "127.0.0.1:{{port.memcached}}"
+        target: "{{private_ip.mem1}}:{{port.memcached_pipe}}"
+        name: memcached
+  vars_files:
+    - secrets/{{txbits_env}}/vars.yml
+  roles:
+    - lumberjack
+    - loadbalancer
+    - spiped
+    - exchange_frontend
+
+- hosts: wallet
+  vars:
+    txbits_config: txbits_wallet.conf
+    lumberjack_config: lumberjack_wallet.conf
+    txbits_service: yes
+    spipes:
+      - type: e
+        source: "127.0.0.1:{{port.bitcoind}}"
+        target: "{{private_ip.btc1}}:{{port.bitcoind_pipe}}"
+        name: bitcoind
+      - type: e
+        source: "127.0.0.1:{{port.litecoind}}"
+        target: "{{private_ip.ltc1}}:{{port.litecoind_pipe}}"
+        name: litecoind
+  vars_files:
+    - secrets/{{txbits_env}}/vars.yml
+  roles:
+    - lumberjack
+    - spiped
+    - exchange_frontend
+
+- hosts: bitcoind
+  vars:
+    lumberjack_config: lumberjack_bitcoind.conf
+    coin_git: https://github.com/bitcoin/bitcoin.git
+    coin_version: v0.11.0
+    coin_name: bitcoin
+    coind_name: bitcoind
+    spipes:
+      - type: d
+        source: "0.0.0.0:{{port.bitcoind_pipe}}"
+        target: "127.0.0.1:{{port.bitcoind}}"
+        name: bitcoind
+  vars_files:
+    - secrets/{{txbits_env}}/vars.yml
+  roles:
+    - lumberjack
+    - coind
+    - spiped
+
+- hosts: litecoind
+  vars:
+    lumberjack_config: lumberjack_litecoind.conf
+    coin_git: https://github.com/litecoin-project/litecoin.git
+    coin_version: v0.10.2.2
+    coin_name: litecoin
+    coind_name: litecoind
+    spipes:
+      - type: d
+        source: "0.0.0.0:{{port.litecoind_pipe}}"
+        target: "127.0.0.1:{{port.litecoind}}"
+        name: litecoind
+  vars_files:
+    - secrets/{{txbits_env}}/vars.yml
+  roles:
+    - lumberjack
+    - coind
+    - spiped
+
+- hosts: mail
+  vars_files:
+    - secrets/{{txbits_env}}/vars.yml
+  roles:
+    - personal-mailserver
+
+- hosts: monitor
+  vars_files:
+    - secrets/{{txbits_env}}/vars.yml
+  roles:
+    - monitor

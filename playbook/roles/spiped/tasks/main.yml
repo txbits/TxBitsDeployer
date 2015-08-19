@@ -1,0 +1,36 @@
+# install spiped
+
+- apt: name=libssl-dev state=present
+- get_url: url=http://www.tarsnap.com/spiped/spiped-1.4.2.tgz sha256sum=dcb668f98a6bd761ff542f7079034f828f792259300eeb16aab53b687a805bde dest=/root/spiped-1.4.2.tgz
+- command: tar -zxvf spiped-1.4.2.tgz chdir=/root creates=/root/spiped-1.4.2
+- command: make chdir=/root/spiped-1.4.2 creates=/root/spiped-1.4.2/spipe/spipe
+- command: install --mode=755 --owner=root /root/spiped-1.4.2/spipe/spipe /usr/bin/spipe creates=/usr/bin/spipe
+- command: install --mode=755 --owner=root /root/spiped-1.4.2/spiped/spiped /usr/bin/spiped creates=/usr/bin/spiped
+
+# set up spiped secrets
+
+- file: path=/etc/spiped state=directory mode=755
+
+- group: name=spiped-{{item.name}}
+  with_items: spipes
+
+- user: name=spiped-{{item.name}} group=spiped-{{item.name}}
+  with_items: spipes
+
+- copy: src=secrets/{{txbits_env}}/spiped/{{item.name}} dest=/etc/spiped/secret-{{item.name}} owner=root group=spiped-{{item.name}} mode=640
+  with_items: spipes
+  notify:
+    - restart spiped
+
+# set up spiped to run on startup and get restarted if it goes down
+
+- file: path=/etc/sv/spiped-{{item.name}} state=directory
+  with_items: spipes
+
+- file: src=/etc/sv/spiped-{{item.name}} dest=/etc/service/spiped-{{item.name}} state=link
+  with_items: spipes
+
+- template: src=sv_spiped dest=/etc/sv/spiped-{{item.name}}/run mode=755
+  with_items: spipes
+  notify:
+    - restart spiped

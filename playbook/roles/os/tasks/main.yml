@@ -1,0 +1,81 @@
+# os stuff
+- copy: src=GPG-KEY-elasticsearch dest=/root/GPG-KEY-elasticsearch
+- command: apt-key add /root/GPG-KEY-elasticsearch
+  changed_when: False
+- copy: src=GPG-KEY-postgresql dest=/root/GPG-KEY-postgresql
+- command: apt-key add /root/GPG-KEY-postgresql
+  changed_when: False
+- copy: src=GPG-KEY-java8 dest=/root/GPG-KEY-java8
+- command: apt-key add /root/GPG-KEY-java8
+  changed_when: False
+- copy: src=sources.list dest=/etc/apt/sources.list owner=root group=root mode=644
+
+# hostname
+- copy: content={{inventory_hostname}} dest=/etc/hostname
+- command: hostname {{inventory_hostname}}
+  changed_when: False
+- template: src=hosts dest=/etc/hosts
+
+# firewall stuff and packages
+- name: Upgrade packages
+  apt: upgrade=yes update_cache=yes
+  tags:
+  - slow
+- apt: name=iptables state=present
+- apt: name=ferm state=present
+- file: path=/etc/ferm owner=root group=root mode=0700 state=directory
+- template: src=ferm.conf dest=/etc/ferm/ferm.conf owner=root group=root mode=600
+  notify:
+  - reload firewall
+- service: name=ferm state=started enabled=yes
+  changed_when: False
+
+# swap
+- command: dd if=/dev/zero of=/swap bs=1024 count=1048576 creates=/swap
+
+- name: Change swap file permissions
+  file: path=/swap
+        owner=root
+        group=root
+        mode=0600
+
+- name: Check swap file type
+  command: file /swap
+  register: swapfile
+  changed_when: False
+
+- name: Make swap file
+  command: mkswap /swap
+  when: swapfile.stdout.find('swap file') == -1
+
+- name: Write swap entry in fstab
+  mount: name=none
+         src=/swap
+         fstype=swap
+         opts=sw
+         passno=0
+         dump=0
+         state=present
+
+- name: Mount swap
+  command: swapon /swap
+  when: ansible_swaptotal_mb < 1
+
+# global stuff that should happen only once
+- apt: name=openjdk-6-jdk state=absent
+- apt: name=openjdk-6-jre state=absent
+- apt: name=openjdk-6-jre-headless state=absent
+- apt: name=openjdk-6-jre-lib state=absent
+- apt: name=openjdk-7-jdk state=absent
+- shell: /bin/echo debconf shared/accepted-oracle-license-v1-1 select true | /usr/bin/debconf-set-selections
+- shell: /bin/echo debconf shared/accepted-oracle-license-v1-1 seen true | /usr/bin/debconf-set-selections
+- apt: name=oracle-java8-installer state=present
+  environment:
+    DEBIAN_FRONTEND: noninteractive
+- apt: name=runit state=present
+
+# automated updates
+#XXX: this potentially conflicts with the mailserver automated updates - TODO: make the mailserver ones off by default, update this to send emails (like the mailserver ones) to some useful email address
+- apt: name=unattended-upgrades state=present
+- copy: src=apt-periodic dest=/etc/apt/apt.conf.d/10periodic mode=644
+

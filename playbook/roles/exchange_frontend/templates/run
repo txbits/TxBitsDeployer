@@ -1,0 +1,2 @@
+#!/bin/sh
+exec chpst -u txbits:txbits /opt/txbits/current/bin/txbits -Dconfig.file=/opt/txbits/application.conf -Dhttp.port={{ port.frontend }} -Dhttp.address=0.0.0.0 -J-Xms350m -J-Xmx350m -Djavax.net.ssl.trustStore=/opt/txbits/truststore -Djavax.net.ssl.trustStorePassword=password -Dpidfile.path=/dev/null >> /var/log/txbits/txbits.log 2>> /var/log/txbits/txbits.err

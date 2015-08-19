@@ -1,0 +1,79 @@
+- apt: name={{ item }}
+  with_items:
+    - build-essential
+    - libboost-all-dev
+    - libssl-dev
+    - libdb-dev
+    - libdb++-dev
+    - libglib2.0-dev
+    - git
+    - autoconf
+    - libtool
+
+# create user
+- group: name={{coind_name}} state=present system=yes
+- user: name={{coind_name}} createhome=no group={{coind_name}} state=present system=yes
+- file: path=/opt/{{coin_name}} state=directory owner=root group={{coind_name}} mode=750
+
+# clone
+- git: repo={{coin_git}}
+       dest=/opt/{{coin_name}}/{{coin_name}}
+       version={{coin_version}}
+- file: path=/opt/{{coin_name}}/{{coin_name}} recurse=yes owner=root group={{coind_name}}
+
+# compile
+- copy: src=build/{{coind_name}}.sh dest=/opt/{{coin_name}}/build_{{coind_name}}.sh mode=755 owner=root group={{coind_name}}
+
+- shell: /opt/{{coin_name}}/build_{{coind_name}}.sh
+  args:
+    creates: /opt/{{coin_name}}/{{coin_name}}/src/{{coind_name}}
+# force rebuild (TODO; is there a better way to make this possible?)
+- shell: /opt/{{coin_name}}/build_{{coind_name}}.sh
+  when: rebuild_coins is defined and rebuild_coins == 'true'
+  tags:
+    - rebuild_coins
+
+# install
+- file: path=/etc/sv/{{coind_name}} state=directory
+- copy: src=run/{{coind_name}} dest=/etc/sv/{{coind_name}}/run mode=755 owner=root group=root
+  notify:
+  - restart {{coind_name}}
+- file: src=/etc/sv/{{coind_name}} dest=/etc/service/{{coind_name}} state=link
+
+# config
+- file: path=/opt/{{coin_name}}/.{{coin_name}} state=directory owner=root group={{coind_name}} mode=770
+- template: src={{coin_name}}.conf dest=/opt/{{coin_name}}/{{coin_name}}.conf mode=640 owner=root group={{coind_name}}
+  notify:
+  - restart {{coind_name}}
+
+############ backup system
+- apt: name={{ item }}
+  with_items:
+   - libssl-dev
+   - zlib1g-dev
+   - e2fslibs-dev
+  when: backups_enabled
+
+# this is just a place to compile tarsnap before installing it
+# tarsnap is not a service that runs as a user
+- file: path=/opt/tarsnap state=directory owner=root group=root mode=700
+  when: backups_enabled
+
+- get_url: dest=/opt/tarsnap/tarsnap-autoconf-1.0.35.tgz url=https://www.tarsnap.com/download/tarsnap-autoconf-1.0.35.tgz sha256sum=6c9f6756bc43bc225b842f7e3a0ec7204e0cf606e10559d27704e1cc33098c9a
+  when: backups_enabled
+- command: tar -zxvf tarsnap-autoconf-1.0.35.tgz chdir=/opt/tarsnap creates=/opt/tarsnap/tarsnap-autoconf-1.0.35
+  when: backups_enabled
+- command: ./configure chdir=/opt/tarsnap/tarsnap-autoconf-1.0.35 creates=/opt/tarsnap/tarsnap-autoconf-1.0.35/Makefile
+  when: backups_enabled
+- command: make all install clean chdir=/opt/tarsnap/tarsnap-autoconf-1.0.35 creates=/usr/local/bin/tarsnap
+  when: backups_enabled
+
+# deploy write only backup keys
+
+- copy: src=secrets/{{txbits_env}}/tarsnap/{{coin_name}}/writeonly.key dest=/opt/{{coin_name}}/tarsnap.key owner=root group={{coind_name}} mode=750
+  when: backups_enabled
+
+# set up periodic backups
+
+- cron: name="{{coin_name}} backup" user={{coind_name}} state=present job="stat /opt/{{coin_name}}/backup.dat && /usr/local/bin/tarsnap --keyfile /opt/{{coin_name}}/tarsnap.key --cachedir /opt/{{coin_name}}/tarsnapcache -c -f txbits-{{coin_name}}-$(/bin/date +\%s) /opt/{{coin_name}}/backup.dat; rm /opt/{{coin_name}}/backup.dat"
+  when: backups_enabled

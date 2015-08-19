@@ -1,0 +1,2 @@
+- name: restart lumberjack
+  shell: service lumberjack restart

@@ -1,0 +1,7 @@
+- apt: name=htop
+- apt: name=vim
+
+- copy: src=bashrc.{{txbits_env}} dest=/root/.bashrc
+- copy: src=vimrc dest=/root/.vimrc
+- file: path=/root/.vim/colors state=directory
+- copy: src=vim/molokai.vim dest=/root/.vim/colors/molokai.vim

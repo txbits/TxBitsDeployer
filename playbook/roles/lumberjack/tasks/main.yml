@@ -1,0 +1,44 @@
+# TODO: make the base config forward only system logs and have each service run its own lumberjack to forward its own logs
+
+- apt: name=build-essential state=present
+- apt: name=git state=present
+
+- group: name=lumberjack state=present system=yes
+- user: name=lumberjack createhome=no group=lumberjack state=present system=yes
+
+- get_url: url=https://go.googlecode.com/files/go1.2.1.linux-amd64.tar.gz sha256sum=d6e9623b8cf566599003dac6c402d03a62f48d98158bfcfc3b0c743b51ad4be6 dest=/root/go.tar.gz
+- command: tar -zxvf go.tar.gz chdir=/root creates=/root/go
+- command: cp -r /root/go /opt/go creates=/opt/go
+
+- git: repo=https://github.com/elasticsearch/logstash-forwarder.git
+       dest=/root/logstash-forwarder
+       version=v0.4.0
+- command: cp -r /root/logstash-forwarder /opt/lumberjack creates=/opt/lumberjack
+- file: path=/opt/lumberjack state=directory owner=root group=lumberjack mode=750
+
+- shell: sh > /opt/lumberjack/lumberjack_make.log -c 'export PATH=/opt/go/bin:$PATH; export GOROOT=/opt/go; make 2>&1'
+  args:
+    chdir: /opt/lumberjack
+    creates: /opt/lumberjack/build/bin/lumberjack.sh
+- command: cp -r /opt/lumberjack/build/bin/ /opt/lumberjack/bin creates=/opt/lumberjack/bin
+
+- file: path=/opt/lumberjack recurse=true owner=root group=lumberjack
+- file: path=/opt/lumberjack/bin recurse=true owner=root group=lumberjack mode=750
+- file: path=/opt/lumberjack recurse=false owner=root group=lumberjack mode=750
+
+- copy: src=init.d/lumberjack dest=/etc/init.d/lumberjack owner=root group=root mode=755
+
+- command: update-rc.d lumberjack defaults creates=/etc/rc3.d/S17lumberjack
+# TODO: lumberjack config per service
+- template: src={{lumberjack_config}} dest=/etc/lumberjack.conf owner=root group=lumberjack mode=640
+  notify:
+  - restart lumberjack
+- copy: src=secrets/{{txbits_env}}/certs/lumberjack/lumberjack.key dest=/opt/lumberjack/lumberjack.key owner=root group=lumberjack mode=640
+  notify:
+  - restart lumberjack
+- copy: src=secrets/{{txbits_env}}/certs/lumberjack/lumberjack.crt dest=/opt/lumberjack/lumberjack.crt owner=root group=lumberjack mode=640
+  notify:
+  - restart lumberjack
+- copy: src=secrets/{{txbits_env}}/certs/lumberjack/monitor_ca.crt dest=/opt/lumberjack/monitor_ca.crt owner=root group=lumberjack mode=640
+  notify:
+  - restart lumberjack

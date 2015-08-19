@@ -1,0 +1,63 @@
+#!/bin/bash
+# chkconfig: 2345 20 80
+# description: kyc start/shutdown script
+# processname: kyc
+# pidfile: /home/ec2-user/kyc/current/RUNNING_PID
+#
+
+# Source function library.
+. /etc/rc.d/init.d/functions
+
+# Path to your Play application install folder
+prog=/home/ec2-user/kyc/current/bin/kyc
+kyc=$(basename $prog)
+working_dir=/home/ec2-user/kyc/current
+
+OPTS='-Dconfig.file=/home/ec2-user/kyc/current/conf/prod/testnet.conf -Dhttp.port=9000 -Dhttp.address=0.0.0.0 -mem 500'
+
+logfile=/home/ec2-user/kyc.log
+errorlog=/home/ec2-user/kyc.err
+
+start() {
+    echo -n "Starting $kyc: "
+    mkdir -p $working_dir
+    cd $working_dir
+    chown ec2-user:ec2-user $working_dir
+    daemon --user=ec2-user "$prog $OPTS 2>>$errorlog >>$logfile &"
+    retval=$?
+    if [ $retval -eq 0 ]; then
+        echo_success
+    else
+        echo_failure
+    fi
+    echo
+    return $retval
+}
+stop() {
+    echo -n "Shutting down $kyc: "
+    killproc -p $working_dir/RUNNING_PID $kyc
+    retval=$?
+    echo
+    return $retval
+}
+status() {
+    status $kyc
+}
+case "$1" in
+    start)
+    start
+    ;;
+    stop)
+    stop
+    ;;
+    restart|reload)
+    stop
+    start
+    ;;
+    status)
+    status
+    ;;
+    *)
+    echo "Usage: $0 {start|stop|restart|status}"
+esac
+exit 0

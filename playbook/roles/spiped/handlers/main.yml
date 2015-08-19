@@ -1,0 +1,3 @@
+- name: restart spiped
+  command: sv restart spiped-{{item.name}}
+  with_items: spipes

@@ -1,0 +1,69 @@
+txbits_env: staging_testnet
+
+root_domain:    staging-testnet-txbits.com
+# for webservers
+frontend_fqdn:             {{root_domain}}
+monitor_fqdn:      monitor.{{root_domain}}
+# disabled
+redirect_from_fqdn:            example.com
+database_fqdn: businesscat.{{root_domain}}
+
+# for the load balancer
+frontend_hosts:
+  - localhost:9000
+
+# for the mail module
+mailserver_fqdn: mail.staging-testnet-txbits.com
+mail_for_fqdn: staging-testnet-txbits.com
+mail_username: txbits
+secrets_path_prefix: "secrets/{{txbits_env}}"
+
+# for usage below
+hosts:
+  grumpycat: 192.168.56.104
+  longcat: 192.168.56.107
+  limecat: 192.168.56.106
+  businesscat: 192.168.56.102
+  bitcat: 192.168.56.105
+  litecat: 192.168.56.103
+  mail: 192.168.56.108
+
+internal_net: 192.168.56.0/24
+
+# for inter-machine communication
+private_ip:
+  lb1: localhost
+  mem: localhost
+  mem1: "{{ hosts.businesscat }}"
+  mon1: "{{ hosts.grumpycat }}"
+  es1: localhost
+  pg1: "{{ hosts.businesscat }}"
+  fe1: localhost
+  btc: localhost
+  btc1: "{{hosts.bitcat}}"
+  ltc: localhost
+  ltc1: "{{hosts.litecat}}"
+  mail: "{{hosts.mail}}"
+port:
+  memcached_pipe: 11212
+  memcached: 11211
+  postgresql: 5432
+  logstash: 5043
+  elasticsearch: 9200
+  frontend: 9000
+  bitcoind_pipe: 11001
+  bitcoind: 10001
+  litecoind_pipe: 11000
+  litecoind: 10000
+
+# for restricting who can ssh in
+admin_network: 0.0.0.0/0
+
+# this makes sure that the actions that depend on these vars never happen
+# unless we explicitly evoke them
+db_upgrade: false
+db_populate: false
+db_wipe: false
+
+backups_enabled: false
+fake_money: true

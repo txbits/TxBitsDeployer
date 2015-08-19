@@ -1,0 +1,2 @@
+- name: restart {{coind_name}}
+  command: sv restart {{coind_name}}

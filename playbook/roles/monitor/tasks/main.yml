@@ -1,0 +1,58 @@
+# install shit
+- apt: name=unzip state=present
+- apt: name=nginx state=present
+- service: name=nginx enabled=yes
+- apt: name=logstash state=present
+- service: name=logstash enabled=yes
+- apt: name=elasticsearch state=present
+- service: name=elasticsearch enabled=yes
+
+- name: nginx cert directory
+  file: path=/opt/nginx-cert state=directory owner=root group=www-data mode=750
+
+- name: logstash init script
+  file: src=logstash.init dest=/etc/init.d/logstash owner=root group=root mode=755
+  notify:
+  - restart logstash
+
+- name: logstash config
+  template: src=logstash.conf dest=/etc/logstash/conf.d/logstash.conf owner=root group=logstash mode=640
+  notify:
+  - restart logstash
+
+- copy: src=secrets/{{txbits_env}}/certs/lumberjack/lumberjack_server.key dest=/opt/logstash/lumberjack_server.key owner=root group=logstash mode=640
+  notify:
+  - restart logstash
+
+- copy: src=secrets/{{txbits_env}}/certs/lumberjack/lumberjack_server.crt dest=/opt/logstash/lumberjack_server.crt owner=root group=logstash mode=640
+  notify:
+  - restart logstash
+
+- template: src=elasticsearch.yml dest=/etc/elasticsearch/elasticsearch.yml owner=root group=elasticsearch mode=640
+  notify:
+  - restart elasticsearch
+
+- template: src=nginx/kibana_elasticsearch.conf dest=/etc/nginx/sites-available/kibana_elasticsearch.conf
+  notify:
+  - restart nginx
+
+- file: src=/etc/nginx/sites-available/kibana_elasticsearch.conf dest=/etc/nginx/sites-enabled/kibana_elasticsearch.conf  mode=644 state=link
+  notify:
+  - restart nginx
+
+- apt: name=python-passlib state=present #needed for htpasswd module
+- htpasswd: path=/etc/nginx/conf.d/kibana.monitor.htpasswd name={{kibana_username}} password={{kibana_password}} owner=root group=www-data mode=640
+
+- name: certs, keys
+  copy: src={{ item.src }} dest={{ item.dst }} mode={{ item.mod }} owner=root group=www-data
+  with_items:
+    - { src: "secrets/{{txbits_env}}/certs/{{monitor_fqdn}}/cert.pem", dst: "/opt/nginx-cert/{{monitor_fqdn}}.pem", mod: 640}
+    - { src: "secrets/{{txbits_env}}/certs/{{monitor_fqdn}}/cert.key", dst: "/opt/nginx-cert/{{monitor_fqdn}}.key", mod: 640}
+  notify:
+    - restart nginx
+
+- get_url: url=https://download.elasticsearch.org/kibana/kibana/kibana-3.1.0.zip dest=/root/kibana.zip
+- command: unzip kibana.zip chdir=/root creates=/root/kibana-3.1.0
+- command: cp -r /root/kibana-3.1.0 /opt/kibana creates=/opt/kibana
+- file: path=/opt/kibana state=directory recurse=true owner=root group=www-data mode=750
+- copy: src=kibana_config.js dest=/opt/kibana/config.js owner=root group=www-data mode=640

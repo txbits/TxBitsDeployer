@@ -1,0 +1,70 @@
+- apt: name=postgresql-9.1 state=absent
+- apt: name=postgresql-9.4 state=absent
+- apt: name=postgresql-9.3 state=present
+- apt: name=sudo state=present
+- apt: name=postgresql-contrib-9.1 state=absent
+- apt: name=postgresql-contrib-9.4 state=absent
+- apt: name=postgresql-contrib-9.3 state=present
+
+- template: src=postgres/postgresql.conf dest=/etc/postgresql/9.3/main/postgresql.conf
+  notify:
+    - restart postgres
+
+- template: src=postgres/pg_hba.conf dest=/etc/postgresql/9.3/main/pg_hba.conf
+  notify:
+    - restart postgres
+
+- file: path=/opt/postgres state=directory owner=root group=postgres mode=750
+- copy: src=secrets/{{txbits_env}}/certs/postgres/server.key dest=/opt/postgres/server.key mode=640 owner=root group=postgres
+  notify:
+  - restart postgres
+- copy: src=secrets/{{txbits_env}}/certs/postgres/server.crt dest=/opt/postgres/server.crt mode=640 owner=root group=postgres
+  notify:
+  - restart postgres
+
+- meta: flush_handlers
+
+- service: name=postgresql state=started enabled=yes
+
+# these are idempotent actions that have hard to detect results, so they are silenced for now
+- shell: /usr/bin/sudo -u postgres psql -c 'create database txbits_{{txbits_env}}' || true
+  changed_when: False
+- shell: /usr/bin/sudo -u postgres psql -c "create user {{postgres_super_user}} with superuser password '{{postgres_super_password}}';" || true
+  changed_when: False
+- shell: /usr/bin/sudo -u postgres psql -c "create user {{postgres_frontend_user}} password '{{postgres_frontend_password}}';" || true
+  changed_when: False
+- shell: /usr/bin/sudo -u postgres psql -c "create user {{postgres_wallet_user}} with superuser password '{{postgres_wallet_password}}';" || true
+  changed_when: False
+
+
+# apply evolutions when asked to
+- shell: /etc/sv/txbits/run || true
+  tags:
+    - db_upgrade
+  when: db_upgrade
+
+# these are idempotent actions that have hard to detect results, so they are silenced for now
+# This allows the frontend on testnet to give users free money
+- shell: /usr/bin/sudo -u postgres psql txbits_{{txbits_env}} -c 'alter function add_fake_money(bigint, varchar(4), numeric(23,8)) security definer;' || true
+  changed_when: False
+  when: fake_money
+  tags:
+    - db_upgrade
+- shell: /usr/bin/sudo -u postgres psql txbits_{{txbits_env}} -c 'alter function remove_fake_money(bigint, varchar(4), numeric(23,8)) security definer;' || true
+  changed_when: False
+  when: fake_money
+  tags:
+    - db_upgrade
+
+- copy: src=postgres/{{txbits_env}}_populate.sql dest=/opt/postgres/{{txbits_env}}_populate.sql mode=640 owner=root group=postgres
+- copy: src=postgres/wipe.sql dest=/opt/postgres/wipe.sql mode=640 owner=root group=postgres
+
+- shell: /usr/bin/sudo -u postgres psql txbits_{{txbits_env}} < /opt/postgres/{{txbits_env}}_populate.sql
+  tags:
+    - db_populate
+  when: db_populate
+
+- shell: /usr/bin/sudo -u postgres psql txbits_{{txbits_env}} < /opt/postgres/wipe.sql
+  tags:
+    - db_wipe
+  when: db_wipe

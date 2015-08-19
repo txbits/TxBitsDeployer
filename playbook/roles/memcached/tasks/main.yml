@@ -1,0 +1,7 @@
+- apt: name=memcached
+
+- template: src=memcached/memcached.conf dest=/etc/memcached.conf mode=644
+  notify:
+    - restart memcached
+
+- service: name=memcached state=started enabled=yes

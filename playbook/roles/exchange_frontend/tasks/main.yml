@@ -1,0 +1,75 @@
+- group: name=txbits state=present system=yes
+- user: name=txbits createhome=no group=txbits state=present system=yes
+# TODO: (XXX) make it so that txbits can't delete / modify its own logs
+- file: path=/var/log/txbits state=directory mode=775 owner=root group=root
+
+- file: path=/etc/sv/txbits state=directory
+- file: src=/etc/sv/txbits dest=/etc/service/txbits state=link
+  when: txbits_service is defined
+- template: src=run dest=/etc/sv/txbits/run mode=755
+  notify:
+    - restart txbits
+
+- file: path=/opt/txbits state=directory owner=root group=txbits mode=750
+
+- debug: msg="remeber to run `./txbits/txbits.sh dist` first to build the thing you are deploying"
+
+# get rid of all old files before upgrading
+- file: path=/opt/txbits/txbits-1.0-SNAPSHOT state=absent
+  tags:
+    - deploy_frontend
+  notify:
+    - restart txbits
+
+- unarchive: src=../txbits/txbits/target/universal/txbits-1.0-SNAPSHOT.tgz dest=/opt/txbits owner=root group=txbits
+  tags:
+    - deploy_frontend
+  notify:
+    - restart txbits
+
+# apparently unarchive above ignores the group?
+- file: path=/opt/txbits/txbits-1.0-SNAPSHOT recurse=yes owner=root group=txbits
+  tags:
+    - deploy_frontend
+  notify:
+    - restart txbits
+
+# postgres "certificate authority"
+- file: path=/home/txbits/.postgresql state=directory mode=755 owner=root group=txbits
+  tags:
+    - deploy_frotend
+- copy: src=secrets/{{txbits_env}}/certs/postgres/server.crt dest=/home/txbits/.postgresql/root.crt mode=644 owner=root group=txbits
+  tags:
+    - deploy_frotend
+  notify:
+    - restart txbits
+
+# deploy
+
+- copy: src=secrets/{{txbits_env}}/txbits_truststore dest=/opt/txbits/truststore mode=644 owner=root group=txbits
+  tags:
+    - deploy_frotend
+  notify:
+    - restart txbits
+
+- file: src=/opt/txbits/txbits-1.0-SNAPSHOT path=/opt/txbits/current state=link owner=root group=txbits
+  tags:
+    - deploy_frontend
+
+- template: src=logback.xml dest=/opt/txbits/current/conf/logback.xml owner=root group=txbits mode=644
+  tags:
+    - deploy_frontend
+  notify:
+    - restart txbits
+
+- template: src=txbits_common.conf dest=/opt/txbits/common.conf owner=root group=txbits mode=644
+  tags:
+    - deploy_frontend
+  notify:
+    - restart txbits
+
+- template: src={{txbits_config}} dest=/opt/txbits/application.conf owner=root group=txbits mode=644
+  tags:
+    - deploy_frontend
+  notify:
+    - restart txbits

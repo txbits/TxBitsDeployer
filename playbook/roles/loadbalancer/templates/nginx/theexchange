@@ -1,0 +1,122 @@
+#don't send the nginx version number in error pages and Server header
+#server_tokens off;
+ 
+# config to don't allow the browser to render the page inside an frame or iframe
+# and avoid clickjacking http://en.wikipedia.org/wiki/Clickjacking
+# if you need to allow [i]frames, you can use SAMEORIGIN or even set an uri with ALLOW-FROM uri
+# https://developer.mozilla.org/en-US/docs/HTTP/X-Frame-Options
+#add_header X-Frame-Options SAMEORIGIN;
+ 
+# when serving user-supplied content, include a X-Content-Type-Options: nosniff header along with the Content-Type: header,
+# to disable content-type sniffing on some browsers.
+# https://www.owasp.org/index.php/List_of_useful_HTTP_headers
+# currently supported in IE > 8 http://blogs.msdn.com/b/ie/archive/2008/09/02/ie8-security-part-vi-beta-2-update.aspx
+# http://msdn.microsoft.com/en-us/library/ie/gg622941(v=vs.85).aspx
+# 'soon' on Firefox https://bugzilla.mozilla.org/show_bug.cgi?id=471020
+#add_header X-Content-Type-Options nosniff;
+ 
+# This header enables the Cross-site scripting (XSS) filter built into most recent web browsers.
+# It's usually enabled by default anyway, so the role of this header is to re-enable the filter for
+# this particular website if it was disabled by the user.
+# https://www.owasp.org/index.php/List_of_useful_HTTP_headers
+#add_header X-XSS-Protection "1; mode=block";
+ 
+# with Content Security Policy (CSP) enabled(and a browser that supports it(http://caniuse.com/#feat=contentsecuritypolicy),
+# you can tell the browser that it can only download content from the domains you explicitly allow
+# http://www.html5rocks.com/en/tutorials/security/content-security-policy/
+# https://www.owasp.org/index.php/Content_Security_Policy
+# I need to change our application code so we can increase security by disabling 'unsafe-inline' 'unsafe-eval'
+# directives for css and js(if you have inline css or js, you will need to keep it too).
+# more: http://www.html5rocks.com/en/tutorials/security/content-security-policy/#inline-code-considered-harmful
+#add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://ssl.google-analytics.com img-src 'self' style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://assets.zendesk.com; font-src 'self' https://themes.googleusercontent.com; frame-src https://assets.zendesk.com https://www.facebook.com https://s-static.ak.facebook.com https://tautt.zendesk.com; object-src 'none'";
+ 
+
+# Redirect everything to HTTPS and all subdomains (or the root) to {{frontend_fqdn}}
+server {
+    listen 80;
+    server_name {{frontend_fqdn}} *.{{frontend_fqdn}};
+    rewrite ^ https://{{frontend_fqdn}}$request_uri? permanent;
+}
+server {
+    listen 80;
+    server_name {{redirect_from_fqdn}};
+    rewrite ^ https://{{frontend_fqdn}}$request_uri?;
+}
+
+upstream theexchange {
+  server {{ frontend_hosts | join(";\n  server ") }};
+}
+# HTTPS server
+server {
+    listen 443;
+    server_name {{frontend_fqdn}};
+
+
+    # play public assets
+    #root /var/example/target/scala-2.10/classes/public;
+
+    # SSL configuration
+    ssl on;
+    ssl_certificate /opt/nginx-cert/{{frontend_fqdn}}.pem;
+    ssl_certificate_key /opt/nginx-cert/{{frontend_fqdn}}.key;
+
+    # enable session resumption to improve https performance
+    # http://vincent.bernat.im/en/blog/2011-ssl-session-reuse-rfc5077.html
+    ssl_session_cache shared:SSL:50m;
+    ssl_session_timeout 5m;
+
+    # Diffie-Hellman parameter for DHE ciphersuites, recommended 2048 bits
+    ssl_dhparam /opt/nginx-cert/dhparam.pem;
+
+    # enables server-side protection from BEAST attacks
+    # http://blog.ivanristic.com/2013/09/is-beast-still-a-threat.html
+    ssl_prefer_server_ciphers on;
+
+    # disable SSLv3(enabled by default since nginx 0.8.19) since it's less secure then TLS http://en.wikipedia.org/wiki/Secure_Sockets_Layer#SSL_3.0
+    ssl_protocols TLSv1 TLSv1.1 TLSv1.2;
+
+    # ciphers chosen for forward secrecy and compatibility
+    # https://www.eff.org/deeplinks/2015/04/effs-updated-ssl-configuration
+    ssl_ciphers ECDH+AESGCM:ECDH+AES256:ECDH+AES128:ECDH+3DES:DHE-RSA-AES128-SHA:RSA+AES:RSA+3DES:!ADH:!AECDH:!MD5:!DSS;
+
+    # enable ocsp stapling (mechanism by which a site can convey certificate revocation information to visitors in a privacy-preserving, scalable manner)
+    # http://blog.mozilla.org/security/2013/07/29/ocsp-stapling-in-firefox/
+    resolver 8.8.8.8;
+    #ssl_stapling on;
+    # this is needed only if there is no intermediate cert in the ssl_certiciate file
+    #ssl_trusted_certificate /root/cert/ca.pem;
+
+    # config to enable HSTS(HTTP Strict Transport Security) https://developer.mozilla.org/en-US/docs/Security/HTTP_Strict_Transport_Security
+    # to avoid ssl stripping https://en.wikipedia.org/wiki/SSL_stripping#SSL_stripping
+    add_header Strict-Transport-Security "max-age=31536000; includeSubdomains;";
+
+    # static content (with client-side caching enabled)
+    #location /assets/ {
+    #    access_log  off;
+    #    log_not_found off;
+    #    add_header  Pragma "public";
+    #    add_header  Cache-Control "public";
+    #    expires     30d;
+    #    alias /var/example/target/scala-2.10/classes/public/;
+    #}
+
+    # serve assets or request page from proxy (if asset not found)
+    location / {
+        try_files $uri @proxy;
+    }
+
+    # the play web server
+    location @proxy {
+        proxy_pass  http://theexchange;
+        proxy_redirect off;
+        proxy_buffering off;
+
+        #send protocol info to play server
+        proxy_set_header        Host               $host;
+        proxy_set_header        X-Real-IP          $remote_addr;
+        proxy_set_header        X-Forwarded-Proto  https;
+        proxy_set_header        X-Forwarded-Ssl    on;
+        proxy_set_header        X-Forwarded-For    $proxy_add_x_forwarded_for;
+    }
+}
+

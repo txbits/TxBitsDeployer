@@ -8,7 +8,7 @@ An Ansible config to help you deploy TxBits in production.
 1. `bootstrap.sh`
 1. Continue in one of the two sections below
 
-### In development
+### In development / staging
 
 1. Set up a virtual machine with 512 MB of ram and 1 core. We recommend VirtualBox for this. *
 1. Install Debian 7.x on it, add your ssh key and clone it into 7 machines
@@ -33,6 +33,7 @@ An Ansible config to help you deploy TxBits in production.
 ### In production
 
 1. Set up the 7 machines as described above, but this time with a VPS provider. The bitcoin virtual machine might need more storage than the 20GB you get with Digital Ocean for $5/month. Check the current size of the blockchain. Make sure all the machines can talk to each other over a LAN (even though all communication between them is encrypted)
+1. Copy `playbook/staging_testnet_hosts` to `playbook/production_hosts` and replace any references to `staging_testnet` with `production`
 1. Copy `playbook/group_vars/staging_testnet` to `playbook/group_vars/production` if it doesn't already exist
 1. Update the private ips in `playbook/group_vars/production`
 1. Create a secrets file in `playbook/secrets` called `production.json` based on `staging_testnet.json`

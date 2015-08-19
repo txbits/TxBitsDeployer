@@ -1,0 +1,2 @@
+#!/bin/sh
+exec chpst -u bitcoind:bitcoind /opt/bitcoin/bitcoin/src/bitcoind -datadir=/opt/bitcoin/.bitcoin -conf=/opt/bitcoin/bitcoin.conf -daemon=0 >> /var/log/bitcoind.log 2>> /var/log/bitcoind.err

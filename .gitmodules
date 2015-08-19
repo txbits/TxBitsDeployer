@@ -1,0 +1,6 @@
+[submodule "txbits"]
+	path = txbits
+	url = git@github.com:txbits/txbits.git
+[submodule "playbook/roles/personal-mailserver"]
+	path = playbook/roles/personal-mailserver
+	url = git@github.com:vikstrous/personal-mailserver.git

@@ -1,0 +1,27 @@
+- apt: name=nginx state=present
+
+- file: path=/opt/nginx-cert state=directory owner=root group=www-data mode=750
+
+- name: certs, keys, config files
+  copy: src={{ item.src }} dest={{ item.dst }} mode={{ item.mod }} owner=root group=www-data
+  with_items:
+    - { src: "secrets/{{txbits_env}}/certs/{{frontend_fqdn}}/cert.pem", dst: "/opt/nginx-cert/{{frontend_fqdn}}.pem", mod: 640}
+    - { src: "secrets/{{txbits_env}}/certs/{{frontend_fqdn}}/cert.key", dst: "/opt/nginx-cert/{{frontend_fqdn}}.key", mod: 640}
+    - { src: "secrets/{{txbits_env}}/certs/{{frontend_fqdn}}/dhparam.pem", dst: "/opt/nginx-cert/dhparam.pem", mod: 640}
+    - { src: nginx/nginx.conf, dst: /etc/nginx/nginx.conf, mod: 640}
+  notify:
+    - restart nginx
+
+- template: src=nginx/theexchange dest=/etc/nginx/sites-available/theexchange mode=644
+  notify:
+    - restart nginx
+
+- file: src=/etc/nginx/sites-available/theexchange dest=/etc/nginx/sites-enabled/theexchange mode=644 state=link
+  notify:
+    - restart nginx
+
+- file: path=/etc/nginx/sites-enabled/default mode=644 state=absent
+  notify:
+    - restart nginx
+
+- service: name=nginx state=started enabled=yes

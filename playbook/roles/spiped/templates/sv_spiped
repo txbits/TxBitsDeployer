@@ -1,0 +1,2 @@
+#!/bin/sh
+exec chpst -u spiped-{{item.name}}:spiped-{{item.name}} /usr/bin/spiped -{{item.type}} -s {{item.source}} -t {{item.target}} -k /etc/spiped/secret-{{item.name}} -F
