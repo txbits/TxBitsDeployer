@@ -49,4 +49,4 @@ After deploying, you'll need to set up the database in order for the frontend to
 1. `./dbmigrate.sh <environment>`
 1. `./dbpopulate.sh <environment>`
 
-After deploying the database you'll need to restart the frontend.
+After deploying the database you'll need to restart the `frontend` and `wallet`.
