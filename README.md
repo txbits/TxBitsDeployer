@@ -40,3 +40,13 @@ An Ansible config to help you deploy TxBits in production.
 1. Install the only dependency for gen.py: `pip3 install passlib`
 1. Run `python3 ./gen.py production.json`
 1. `./initial_deploy.sh production`
+
+
+### Setting up the database
+
+After deploying, you'll need to set up the database in order for the frontend to start up. It should be as simple as:
+
+1. `./dbmigrate.sh <environment>`
+1. `./dbpopulate.sh <environment>`
+
+After deploying the database you'll need to restart the frontend.
