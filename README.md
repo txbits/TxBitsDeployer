@@ -37,5 +37,6 @@ An Ansible config to help you deploy TxBits in production.
 1. Copy `playbook/group_vars/staging_testnet` to `playbook/group_vars/production` if it doesn't already exist
 1. Update the private ips in `playbook/group_vars/production`
 1. Create a secrets file in `playbook/secrets` called `production.json` based on `staging_testnet.json`
-1. Run `gen.py production.json`
+1. Install the only dependency for gen.py: `pip3 install passlib`
+1. Run `python3 ./gen.py production.json`
 1. `./initial_deploy.sh production`
