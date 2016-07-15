@@ -11,7 +11,7 @@ An Ansible config to help you deploy TxBits in production.
 ### In development / staging
 
 1. Set up a virtual machine with 512 MB of ram and 1 core. We recommend VirtualBox for this. *
-1. Install Debian 7.x on it, add your ssh key and clone it into 7 machines
+1. Install **Debian 7.x** on it, add your ssh key and clone it into 7 machines, this one is important, since deploying any other distro such as Ubuntu 14.04 will lead to odd DPKG and Locale errors.
 1. Check the ips of the machines and put them into `playbook/group_vars/staging_testnet`
 1. On your host set up your hosts file like this:
     ```
